@@ -32,10 +32,10 @@ GROUP BY Code_INSEE_commune""")
     #st.subheader('Bornes par arrondissement')
     #st.write(weekly_data)
     # Bar Chart
-    st.bar_chart(df)
+   
     #st.bar_chart(df['Nbr des bornes'])
     #return rows
-    #st.bar_chart(data=df, width=0, height=0, use_container_width=True)
+    st.bar_chart(data=df, width=0, height=0, use_container_width=True)
 
 
 client = connect_to_bq()
