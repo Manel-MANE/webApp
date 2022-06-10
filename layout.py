@@ -29,6 +29,7 @@ GROUP BY Code_INSEE_commune""")
 
     #df = pd.DataFrame(rows)
     df.columns = ['Arrondissement' ,'Nbr des bornes']
+     df = pd.DataFrame(rows, columns= ['Arrondissement' ,'Nbr des bornes'])
     #print(df)
     #return(df)
     #st.subheader('Bornes par arrondissement')
