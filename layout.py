@@ -27,12 +27,13 @@ GROUP BY Code_INSEE_commune""")
 
     df = pd.DataFrame(rows)
     df.columns = ['Arrondissement' ,'Nbr des bornes']
-    print(df)
+    #print(df)
     #return(df)
     #st.subheader('Bornes par arrondissement')
     #st.write(weekly_data)
     # Bar Chart
-    st.bar_chart(df['Nbr des bornes'])
+    st.bar_chart(data=df)
+    #st.bar_chart(df['Nbr des bornes'])
     #return rows
     #st.bar_chart(data=df, width=0, height=0, use_container_width=True)
 
