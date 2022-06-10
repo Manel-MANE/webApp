@@ -37,7 +37,8 @@ GROUP BY Code_INSEE_commune""")
 client = connect_to_bq()
 left_column, right_column = st.columns(2)
 # You can use a column just like st.sidebar:
-left_column.button('Driver')
+left_column.button('Conducteur')
+left_column.button('Aménageur')
 
 
 
