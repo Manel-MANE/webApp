@@ -102,6 +102,7 @@ with right_column:
 
     #stations_par_arronsdissement(client)
     #pmr()
+    st.subheader('Accessibilité')
     pmr(client)
 
 
