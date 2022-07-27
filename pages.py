@@ -19,11 +19,16 @@ def page_conducteur():
     with c1:
         # number = map_with_filter(client, option)
         coord_geo = functions.pmr_2roues_filter_stations(bq_client, filtrer, pmr, deux_roues)
-        number = coord_geo.shape[0]
-        st.map(coord_geo)
+        if not coord_geo.empty:
+
+            number = coord_geo.shape[0]
+            st.map(coord_geo)
+        else:
+            st.subheader("Oupsii pas de bornes avec vos critères actuellement ! ")
 
     with c2:
-        c2.metric("Nombre de bornes ", number)
+        if not coord_geo.empty:
+            c2.metric("Nombre de bornes ", number)
 
 
 def status_real_time_visualization():
@@ -185,8 +190,6 @@ def get_chart(data):
     return (lines + points + tooltips).interactive()
 
 
-
-
 def page_provider():
 
     status_real_time_visualization()
@@ -202,26 +205,23 @@ def page_provider():
         st.write(" Top 10 des stations les moins utilisées")
         plot_worst_ten_stations()
 
-    c3, c4 = st.columns((1, 1))
-    with c3:
-        st.subheader("Accessibilité")
-
-
-
-
 
     st.subheader('Focus par borne')
     id_borne = st.text_input(label='Entrer ID Borne', value="FR*V75*E9001*02*1")
     st.subheader('Caractéristiques de la borne ', id_borne)
     st.write("Taux d'utilisation journalier de la borne", id_borne)
     data = functions.taux_occupation_journalier(bq_client, id_borne)
-    data = pd.DataFrame(data, columns=["Date", "Taux"])
-    chart = get_chart(data)
-    st.altair_chart(chart, use_container_width=True)
-    st.subheader('Répartition du temps global')
-    plot_repartition_temps(bq_client, id_borne)
+    if not data.empty:
+        data = pd.DataFrame(data, columns=["Date", "Taux"])
+        chart = get_chart(data)
+        st.altair_chart(chart, use_container_width=True)
+        st.subheader('Répartition du temps global')
+        plot_repartition_temps(bq_client, id_borne)
+    else:
+        st.subheader("Oupssii ID invalide ! ")
     # functions.taux_occupation_par_borne(bq_client, id_borne)
 
 
 bq_client = functions.connect_to_bq()
 
+page_conducteur()
