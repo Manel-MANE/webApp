@@ -8,7 +8,7 @@ import pandas as pd
 def page_conducteur():
     status = st.selectbox(
          'Etat actuel des bornes',
-         ('Toutes', 'Disponibles', 'En charge', 'En maintenance'))
+         ('Toutes', 'Disponibles', 'En charge', 'En maintenance'), key='conducteur')
 
     # st.set_page_config(layout="wide")
     filtrer = functions.status_choice(status)
@@ -20,15 +20,16 @@ def page_conducteur():
         # number = map_with_filter(client, option)
         coord_geo = functions.pmr_2roues_filter_stations(bq_client, filtrer, pmr, deux_roues)
         number = coord_geo.shape[0]
+        st.map(coord_geo)
 
     with c2:
-        c2.metric("Les connecteurs disponibles dans cette station", number)
+        c2.metric("Nombre de bornes ", number)
 
 
 def status_real_time_visualization():
     option = st.selectbox(
          'Etat actuel des bornes',
-         ('Toutes', 'Disponibles', 'En charge', 'En maintenance'))
+         ('Toutes', 'Disponibles', 'En charge', 'En maintenance'), key='rt_viz')
 
     # st.set_page_config(layout="wide")
     option = functions.status_choice(option)
@@ -184,6 +185,8 @@ def get_chart(data):
     return (lines + points + tooltips).interactive()
 
 
+
+
 def page_provider():
 
     status_real_time_visualization()
@@ -198,6 +201,14 @@ def page_provider():
         st.subheader("Les Stations les moins utilisées")
         st.write(" Top 10 des stations les moins utilisées")
         plot_worst_ten_stations()
+
+    c3, c4 = st.columns((1, 1))
+    with c3:
+        st.subheader("Accessibilité")
+
+
+
+
 
     st.subheader('Focus par borne')
     id_borne = st.text_input(label='Entrer ID Borne', value="FR*V75*E9001*02*1")
@@ -214,4 +225,3 @@ def page_provider():
 
 bq_client = functions.connect_to_bq()
 
-page_conducteur()
