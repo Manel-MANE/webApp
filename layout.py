@@ -9,9 +9,10 @@ client = functions.connect_to_bq()
 
 
 def conducteur():
-
-    st.markdown("# 🔍 Trouver une station Bélib")
-   
+    
+    
+    st.markdown("# 🚗 Vue conducteur")
+    st.title("# 🔍 Trouver une station Bélib")
     st.sidebar.markdown( "# 🚗 Vue conducteur")
     pages.page_conducteur()
 
