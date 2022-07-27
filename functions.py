@@ -140,11 +140,16 @@ def pmr_2roues_filter_stations(client, status, pmr, deux_roues):
     rows_raw = query_job.result()
     rows = [dict(row) for row in rows_raw]
     df = pd.DataFrame(rows)
+    if not df.empty:
 
-    df['coordonneesxy'] = df['coordonneesxy'].map(lambda d: ast.literal_eval(d))
-    df_new = df.join(pd.DataFrame(df['coordonneesxy'].to_dict()).T)
-    coord = df_new[["lat", "lon"]]
-    return coord
+        df['coordonneesxy'] = df['coordonneesxy'].map(lambda d: ast.literal_eval(d))
+        df_new = df.join(pd.DataFrame(df['coordonneesxy'].to_dict()).T)
+        coord = df_new[["lat", "lon"]]
+        return coord
+    else:
+        return df
+
+
 
 
 def caracteristiques_station(client, id_station):
@@ -203,11 +208,14 @@ order by t.dte Desc
     result = query_job.result()
     rows = [dict(row) for row in result]
     df = pd.DataFrame(rows)
-    exploitation_rate = df['duration'] / df['total_duration'] * 100
-    df['exploitation_rate'] = exploitation_rate
-    exploitation_rate_per_day = df[['dte', 'exploitation_rate']]
-    exploitation_rate_per_day.rename(columns={'dte': 'Date', 'exploitation_rate': 'Taux'}, inplace=True)
-    return exploitation_rate_per_day
+    if not df.empty:
+        exploitation_rate = df['duration'] / df['total_duration'] * 100
+        df['exploitation_rate'] = exploitation_rate
+        exploitation_rate_per_day = df[['dte', 'exploitation_rate']]
+        exploitation_rate_per_day.rename(columns={'dte': 'Date', 'exploitation_rate': 'Taux'}, inplace=True)
+        return exploitation_rate_per_day
+    else:
+        return df
 
 
 def bornes_en_maintenance(client):
@@ -344,11 +352,34 @@ def stations_moins_populaires(client):
     top_stations_moins_populaires = taux_utili_par_station.iloc[-10:]
     return top_stations_moins_populaires
 
-bq_client = connect_to_bq()
-df = pmr_2roues_filter_stations(bq_client,'Disponible', True, False)
-print(df)
-# taux_utilisation_par_borne(bq_client)
-# taux_occupation_par_borne(bq_client, "FR*V75*EPX01*05*1")
-# bornes_en_maintenance(bq_client)
-# bornes_les_plus_en_panne(bq_client)
 
+def pourcentage_stations_accessibles(client):
+    numbers = {}
+    query_2 = """ SELECT COUNT( DISTINCT ID_PDC_local) as pmr FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.bornes` 
+    WHERE ID_PDC_local IS NOT NULL AND Accessibilite_PMR="Réservé PMR" """
+
+    query_1 = """ SELECT COUNT( DISTINCT ID_PDC_local) as non_pmr FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.bornes` 
+    WHERE ID_PDC_local IS NOT NULL AND Accessibilite_PMR="Non accessible" """
+    query_job_1 = client.query(query_1)
+    non_pmr = query_job_1.result()
+    non_pmr = [dict(row) for row in non_pmr]
+    non_pmr = pd.DataFrame(non_pmr)
+    non_pmr = non_pmr['non_pmr'].astype(int)
+    numbers['non_pmr'] = non_pmr
+    query_job_2 = client.query(query_2)
+    pmr = query_job_2.result()
+    pmr = [dict(row) for row in pmr]
+    pmr = pd.DataFrame(pmr)
+    pmr = pmr['pmr'].astype(int)
+    print("pmr", pmr)
+    numbers['pmr'] = pmr
+    print(numbers)
+    numbers = pd.DataFrame(numbers, columns=['non_pmr, pmr'])
+    print(numbers)
+
+
+
+
+
+bq_client = connect_to_bq()
+pmr_2roues_filter_stations(bq_client, 'Disponible', True, False)
