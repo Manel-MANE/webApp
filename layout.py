@@ -2,7 +2,7 @@
 import streamlit as st
 import pages
 import functions
-from main import page_insights
+
 
 
 client = functions.connect_to_bq()
