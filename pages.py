@@ -299,18 +299,22 @@ def page_provider():
     with st.expander("Insights sur les bornes"):
         st.subheader('Focus par borne')
         id_borne = st.text_input(label='Entrer ID Borne', value="FR*V75*E9001*02*1", key='performance_borne')
-        st.subheader('Caractéristiques de la borne ', id_borne)
-        adresse, pmr, deux_roues = functions.caracteristiques_station(bq_client, id_borne)
-        c4, c5, c6 = st.columns((1, 1, 1))
-        with c4:
-            st.write("📍 " + adresse)
-        with c5:
-            st.write("♿" + pmr)
-        with c6:
-            st.write("🏍" + deux_roues)
-        st.write("Taux d'utilisation journalier de la borne", id_borne)
+
+
+        
         data = functions.taux_occupation_journalier(bq_client, id_borne)
         if not data.empty:
+            st.subheader('Caractéristiques de la borne ', id_borne)
+            adresse, pmr, deux_roues = functions.caracteristiques_station(bq_client, id_borne)
+            c4, c5, c6 = st.columns((1, 1, 1))
+            with c4:
+                st.write("📍 " + adresse)
+            with c5:
+                st.write("♿" + pmr)
+            with c6:
+                st.write("🏍" + deux_roues)
+                
+            st.write("Taux d'utilisation journalier de la borne", id_borne)
             # Plot line chart taux d'utilisation journalier
             data = pd.DataFrame(data, columns=["Date", "Taux"])
             chart = get_chart(data)
