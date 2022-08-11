@@ -27,20 +27,6 @@ where ID_PDC_local !='null' and ID_PDC_local !='ID PDC local' """
     return df
 
 
-def taux_occupation(data):
-
-    for ind in data.index:
-        id = data['ID_PDC_local'][ind]
-        # element = {}
-        # element['id']
-
-        taux_par_borne = taux_occupation_par_borne(bq_client, id)
-        taux_par_borne = taux_par_borne.to_dict()
-        # list_element = {}
-        # list_element['id'] = id
-        # list_element['status'] = taux_par_borne
-
-
 def filtrer_stations_selon_status(client, status):
 
     if status != '':
@@ -134,7 +120,6 @@ def pmr_2roues_filter_stations(client, status, pmr, deux_roues):
     jointure = """select id_pdc, coordonneesxy, Accessibilite_PMR, Stationnement_2_roues 
     from status as s inner join filters as f on s.id_pdc = f.ID_PDC_local """
     query = sub_query1 + sub_query2 + filter + jointure
-    print(query)
 
     query_job = client.query(query)
     rows_raw = query_job.result()
@@ -150,18 +135,24 @@ def pmr_2roues_filter_stations(client, status, pmr, deux_roues):
         return df
 
 
-
-
-def caracteristiques_station(client, id_station):
+def caracteristiques_station(client, id_borne):
     # id_pdc = "FR*V75*E9001*02*1"
-    query = """  SELECT * FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.bornes` 
-    WHERE ID_Station = '""" + id_station + """' """
+    query = """  SELECT Adresse_station, Stationnement_2_roues, Accessibilite_PMR FROM 
+    `acn-gcp-octo-hapi.ev_stations_datawarehouse.bornes`  WHERE ID_PDC_local='""" + id_borne + """' """
     query_job = client.query(query)
     result = query_job.result()
     rows = [dict(row) for row in result]
     df = pd.DataFrame(rows)
-    pmr = False
-    deux_roues = False
+    if df.at[0, 'Stationnement_2_roues'] == "True":
+        deux_roues = "Stationnement pour véhicules à deux roues"
+    else:
+        deux_roues = "Pas de stationnement pour véhicules à deux roues"
+    if df.at[0, 'Accessibilite_PMR'] == 'Accessibilite PMR' or df.at[0, 'Accessibilite_PMR'] == 'Réservé PMR':
+        pmr = "Accessible PMR "
+    else:
+        pmr = "Non accessible PMR"
+    adresse = df.at[0, 'Adresse_station']
+    return adresse, pmr, deux_roues
 
 
 def plot_taux_occupation(dataframe):
@@ -213,17 +204,74 @@ order by t.dte Desc
         df['exploitation_rate'] = exploitation_rate
         exploitation_rate_per_day = df[['dte', 'exploitation_rate']]
         exploitation_rate_per_day.rename(columns={'dte': 'Date', 'exploitation_rate': 'Taux'}, inplace=True)
+
+        # Add missing dates
+        idx = pd.date_range(exploitation_rate_per_day['Date'].min(), exploitation_rate_per_day['Date'].max())
+        exploitation_rate_per_day = exploitation_rate_per_day.set_index('Date')
+        exploitation_rate_per_day.index = pd.DatetimeIndex(exploitation_rate_per_day.index)
+        exploitation_rate_per_day = exploitation_rate_per_day.reindex(idx, fill_value=0)
+        exploitation_rate_per_day['Date'] = exploitation_rate_per_day.index
+        print(exploitation_rate_per_day)
         return exploitation_rate_per_day
     else:
         return df
 
 
+def moyenne_mobile_du_taux_occupation_journalier(client, id_borne, window):
+    moy_mob_taux_occupation = taux_occupation_journalier(client, id_borne)
+    moy_mob_taux_occupation['moy_mobile'] = moy_mob_taux_occupation['Taux'].rolling(window).mean()
+    moy_mob_taux_occupation.dropna(inplace=True)  # supprimer les valeurs nulles
+    print(moy_mob_taux_occupation)
+    return moy_mob_taux_occupation
+
+
+def pannes_par_borne(client, id_borne):
+    query = """select  last_updated, max (duration) as down_time from (
+    SELECT id_pdc,  timestamp, last_updated, timestamp_diff(timestamp, last_updated, minute) as duration 
+    FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.status_record`
+    WHERE  id_pdc= '""" + id_borne + """'  and statut_pdc='En maintenance') group by last_updated"""
+
+    query_job = client.query(query)
+    rows_raw = query_job.result()
+    rows = [dict(row) for row in rows_raw]
+    date_et_duree_pannes = pd.DataFrame(rows)
+    return date_et_duree_pannes
+
+
+def pannes_journalieres_par_borne(client, id_borne):
+    query = """ Select statut_pdc, dte, most_recent_state_timestamp,state_starting_timestamp,   
+timestamp_diff(most_recent_state_timestamp, state_starting_timestamp, minute) as duration from (
+SELECT statut_pdc , EXTRACT(DATE FROM timestamp) as dte, max(timestamp) as most_recent_state_timestamp, 
+min(last_updated) as state_starting_timestamp
+FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.status_record_enriched` 
+WHERE timestamp is not null and last_updated is not null and id_pdc= '""" + id_borne + """' 
+and statut_pdc='En maintenance' group by statut_pdc,dte) order by dte  """
+
+    query_job = client.query(query)
+    rows_raw = query_job.result()
+    rows = [dict(row) for row in rows_raw]
+    pannes_groupees_par_jour = pd.DataFrame(rows)
+    if not pannes_groupees_par_jour.empty:
+        duree_pannes_par_jour = pannes_groupees_par_jour[["dte", "duration"]]
+        duree_pannes_par_jour = duree_pannes_par_jour.loc[duree_pannes_par_jour["duration"] != 0]
+
+        # Add missing dates
+        idx = pd.date_range(duree_pannes_par_jour['dte'].min(), duree_pannes_par_jour['dte'].max())
+        duree_pannes_par_jour = duree_pannes_par_jour.set_index('dte')
+        duree_pannes_par_jour.index = pd.DatetimeIndex(duree_pannes_par_jour.index)
+        duree_pannes_par_jour = duree_pannes_par_jour.reindex(idx, fill_value=0)
+        duree_pannes_par_jour['date'] = duree_pannes_par_jour.index
+        return duree_pannes_par_jour
+    else :
+        return pannes_groupees_par_jour
+
+
 def bornes_en_maintenance(client):
     query = """  SELECT distinct(id_pdc), adresse_station  from 
     `acn-gcp-octo-hapi.ev_stations_datawarehouse.status_record_enriched` 
-    as d1 WHERE id_pdc!='NULL' AND coordonneesxy!= 'null'  AND statut_pdc= 'En maintenance' 
-    AND  timestamp = (SELECT MAX(timestamp) FROM 
-    `acn-gcp-octo-hapi.ev_stations_datawarehouse.status_record_enriched` 
+    as d1 WHERE id_pdc!='NULL'  AND statut_pdc= 'En maintenance' 
+    AND  timestamp = (SELECT MAX(timestamp) 
+    FROM `acn-gcp-octo-hapi.ev_stations_datawarehouse.status_record_enriched` 
     as d2 WHERE d1.id_pdc = d2.id_pdc) """
     query_job = client.query(query)
     rows_raw = query_job.result()
@@ -248,7 +296,7 @@ def bornes_les_plus_en_panne(client):
     rows = [dict(row) for row in result]
     df = pd.DataFrame(rows)
     top_down_time = df[0:10]
-    return(top_down_time)
+    return top_down_time
 
 
 def taux_utilisation_par_borne(client):
@@ -371,15 +419,11 @@ def pourcentage_stations_accessibles(client):
     pmr = [dict(row) for row in pmr]
     pmr = pd.DataFrame(pmr)
     pmr = pmr['pmr'].astype(int)
-    print("pmr", pmr)
     numbers['pmr'] = pmr
-    print(numbers)
     numbers = pd.DataFrame(numbers, columns=['non_pmr, pmr'])
-    print(numbers)
 
 
 
 
 
-bq_client = connect_to_bq()
-pmr_2roues_filter_stations(bq_client, 'Disponible', True, False)
+
